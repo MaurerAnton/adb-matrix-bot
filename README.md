@@ -56,6 +56,7 @@ adb:
   listen_port: 5038
   target_host: "127.0.0.1"
   target_port: 5037             # real ADB server
+  session_hold_seconds: 1.0     # hold session open after last command (optional)
 
 intercept:
   shell_commands: true

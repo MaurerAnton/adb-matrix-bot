@@ -95,6 +95,7 @@ async def main():
         capture_logcat=cfg_intercept.get("logcat_output", False),
         logcat_lines_per_message=cfg_intercept.get("logcat_lines_per_message", 50),
         logcat_max_total_lines=cfg_intercept.get("logcat_max_total_lines", 500),
+        hold_seconds=cfg_adb.get("session_hold_seconds", 0.0),
     )
 
     log.info("Starting Matrix bot (login + E2EE)...")

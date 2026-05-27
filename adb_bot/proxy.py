@@ -23,6 +23,7 @@ import asyncio
 import logging
 import re
 import struct
+import time
 from dataclasses import dataclass, field
 from typing import Optional, Callable, Awaitable
 
@@ -527,6 +528,7 @@ class AdbProxyServer:
         capture_logcat: bool = False,
         logcat_lines_per_message: int = 50,
         logcat_max_total_lines: int = 500,
+        hold_seconds: float = 0.0,
         shared_state: Optional[dict] = None,
     ):
         self.listen_host = listen_host
@@ -543,8 +545,17 @@ class AdbProxyServer:
         self.capture_logcat = capture_logcat
         self.logcat_lines_per_message = logcat_lines_per_message
         self.logcat_max_total_lines = logcat_max_total_lines
+        self.hold_seconds = hold_seconds
         self.shared_state = shared_state or {}
         self._server: Optional[asyncio.AbstractServer] = None
+
+        # Session gate: serializes access so that a rapid sequence of commands
+        # (same session) runs without delay, while a second session must wait
+        # for the first to finish + hold_seconds.
+        self._session_gate = asyncio.Semaphore(1)
+        self._active_count = 0
+        self._last_activity = 0.0
+        self._hold_task: Optional[asyncio.Task] = None
 
     async def start(self):
         self._server = await asyncio.start_server(
@@ -566,6 +577,9 @@ class AdbProxyServer:
         client_addr = client_writer.get_extra_info('peername')
         log.debug(f"Client connected: {client_addr}")
 
+        # Wait for session gate (serializes concurrent sessions)
+        await self._acquire_session()
+
         try:
             server_reader, server_writer = await asyncio.open_connection(
                 self.target_host, self.target_port
@@ -573,6 +587,7 @@ class AdbProxyServer:
         except Exception as e:
             log.error(f"Failed to connect to ADB server: {e}")
             client_writer.close()
+            await self._release_session()
             return
 
         scanner = StreamScanner(
@@ -617,6 +632,52 @@ class AdbProxyServer:
                 if not t.done():
                     t.cancel()
             log.debug(f"Client disconnected: {client_addr}")
+            await self._release_session()
+
+    async def _acquire_session(self):
+        """Acquire a slot in the current session, waiting if a different
+        session is active and hold_seconds hasn't elapsed yet."""
+        now = time.monotonic()
+        # Same session only when idle AND within hold window.
+        # If a connection is already active, a new arrival might be a
+        # different session — it must wait for the semaphore.
+        in_session = (self._active_count == 0 and
+                      now - self._last_activity < self.hold_seconds)
+
+        if not in_session:
+            # New session — wait for gate (blocks if another session holds it)
+            await self._session_gate.acquire()
+            # Cancel any pending hold release from a previous session
+            if self._hold_task:
+                self._hold_task.cancel()
+                self._hold_task = None
+
+        self._active_count += 1
+        self._last_activity = now
+
+    async def _release_session(self):
+        """Release a session slot.  When all slots are free the hold timer
+        starts; after hold_seconds the gate opens for the next session."""
+        self._active_count -= 1
+        if self._active_count == 0:
+            self._last_activity = time.monotonic()
+            if self.hold_seconds > 0:
+                self._hold_task = asyncio.create_task(self._release_gate())
+            else:
+                try:
+                    self._session_gate.release()
+                except ValueError:
+                    pass  # already at max
+
+    async def _release_gate(self):
+        """Hold timer callback — opens the gate after hold_seconds."""
+        await asyncio.sleep(self.hold_seconds)
+        if self._active_count == 0:
+            self._hold_task = None
+            try:
+                self._session_gate.release()
+            except ValueError:
+                pass
 
     async def _notify(self, intercept: AdbIntercept):
         if not self.on_intercept:

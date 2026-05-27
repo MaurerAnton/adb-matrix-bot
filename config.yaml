@@ -23,6 +23,11 @@ adb:
   # Real ADB server to forward to
   target_host: "127.0.0.1"
   target_port: 5037
+  # Hold time after session ends before allowing a different session (seconds).
+  # Commands arriving within this window are treated as the same session and
+  # pass through without delay.  Set to e.g. 1.0 to give a bash script time
+  # to finish before another terminal's adb commands are allowed through.
+  session_hold_seconds: 0.0
 
 # Interception rules
 intercept:
