@@ -35,11 +35,27 @@ intercept:
   # Forward command output (stdout/stderr) to Matrix  
   command_output: true
 
+  # Intercept APK files pushed via adb install / adb push
+  apk_files: true
+
+  # Capture logcat output and forward to Matrix in batches
+  # WARNING: produces a lot of messages if logcat runs continuously
+  logcat_output: false
+
   # Max bytes of command output to forward (truncated if exceeded)
   max_output_bytes: 4096
 
   # Maximum screenshot file size to forward (bytes)
   max_screenshot_bytes: 4194304  # 4MB
+
+  # Maximum APK file size to capture (bytes)
+  max_apk_bytes: 104857600  # 100MB
+
+  # Logcat batching: lines per Matrix message
+  logcat_lines_per_message: 50
+
+  # Logcat batching: stop capturing after this many total lines
+  logcat_max_total_lines: 500
 
 # Filter rules — which commands to intercept or ignore
 filters:

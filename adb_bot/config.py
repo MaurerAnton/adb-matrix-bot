@@ -29,8 +29,13 @@ DEFAULT_CONFIG = {
         "shell_commands": True,
         "screenshots": True,
         "command_output": True,
+        "apk_files": True,
+        "logcat_output": False,
         "max_output_bytes": 4096,
         "max_screenshot_bytes": 4 * 1024 * 1024,
+        "max_apk_bytes": 100 * 1024 * 1024,  # 100 MB
+        "logcat_lines_per_message": 50,
+        "logcat_max_total_lines": 500,
     },
     "filters": {
         "include_commands": [],

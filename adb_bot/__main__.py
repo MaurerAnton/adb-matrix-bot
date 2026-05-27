@@ -90,6 +90,11 @@ async def main():
         intercept_commands=cfg_intercept["shell_commands"],
         exclude_commands=cfg_filters["exclude_commands"],
         max_screenshot_bytes=cfg_intercept["max_screenshot_bytes"],
+        capture_apks=cfg_intercept.get("apk_files", True),
+        max_apk_bytes=cfg_intercept.get("max_apk_bytes", 100 * 1024 * 1024),
+        capture_logcat=cfg_intercept.get("logcat_output", False),
+        logcat_lines_per_message=cfg_intercept.get("logcat_lines_per_message", 50),
+        logcat_max_total_lines=cfg_intercept.get("logcat_max_total_lines", 500),
     )
 
     log.info("Starting Matrix bot (login + E2EE)...")

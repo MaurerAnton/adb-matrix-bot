@@ -217,6 +217,10 @@ class MatrixBot:
             await self._send_command(ic)
         elif kind == "screenshot":
             await self._send_screenshot(ic)
+        elif kind == "apk_file":
+            await self._send_apk(ic)
+        elif kind == "logcat_output":
+            await self._send_logcat(ic)
         elif kind == "output":
             await self._send_output(ic)
         elif kind == "error":
@@ -287,6 +291,80 @@ class MatrixBot:
 
         error_text = ic.data.decode('utf-8', errors='replace').strip()
         body = f"{prefix} — `{ic.request}` failed: {error_text}"
+        await self._send_text(body)
+
+    async def _send_apk(self, ic: AdbIntercept):
+        """Upload and send a captured APK file."""
+        if not ic.data:
+            return
+
+        # Extract filename from path
+        filename = ic.request.split('/')[-1] if '/' in ic.request else ic.request
+        if not filename:
+            filename = "captured.apk"
+
+        prefix = "📦 APK"
+        if self.show_device and ic.device_serial:
+            prefix += f" [{ic.device_serial}]"
+
+        if self.show_timestamps:
+            timestamp = datetime.now().strftime(" %Y-%m-%d %H:%M:%S")
+        else:
+            timestamp = ""
+
+        # Upload to Matrix media repository
+        resp, _ = await self._client.upload(
+            ic.data,
+            content_type="application/vnd.android.package-archive",
+            filename=filename,
+        )
+
+        if isinstance(resp, UploadResponse):
+            mxc_url = resp.content_uri
+            log.info("APK uploaded: %s (%d bytes) -> %s", filename, len(ic.data), mxc_url)
+
+            import json
+            try:
+                resp = await self._client.room_send(
+                    room_id=self.room_id,
+                    message_type="m.room.message",
+                    content={
+                        "msgtype": "m.file",
+                        "body": f"{prefix}{timestamp} — {filename}",
+                        "url": mxc_url,
+                        "filename": filename,
+                        "info": {
+                            "mimetype": "application/vnd.android.package-archive",
+                            "size": len(ic.data),
+                        },
+                    },
+                )
+                if isinstance(resp, RoomSendResponse):
+                    log.info("Sent APK to room: %s", filename)
+                else:
+                    log.error("Send APK failed: %s", resp)
+            except Exception as e:
+                log.error("Send APK error: %s", e)
+        else:
+            log.error("APK upload failed: %s", resp)
+            body = f"{prefix}{timestamp} — upload failed for {filename}: {resp}"
+            await self._send_text(body)
+
+    async def _send_logcat(self, ic: AdbIntercept):
+        """Send a chunk of logcat output."""
+        prefix = "📋 Logcat"
+        if self.show_device and ic.device_serial:
+            prefix += f" [{ic.device_serial}]"
+
+        text = ic.data.decode('utf-8', errors='replace').strip()
+        if not text:
+            return
+
+        # Truncate per-message
+        if len(text) > 3000:
+            text = text[:2997] + "..."
+
+        body = f"{prefix}\n```\n{text}\n```"
         await self._send_text(body)
 
     async def _send_text(self, body: str):

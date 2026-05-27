@@ -20,6 +20,8 @@ adb client  ──→  ADB Matrix Bot (proxy)  ──→  real adbd
 - Transparent ADB proxy — no changes required to your adb workflow
 - Command interception with configurable include/exclude filters
 - Screenshot capture — automatically detects `screencap` commands and extracts the PNG from the raw ADB stream
+- **APK interception** — captures `.apk` files pushed via `adb install` or `adb push` by parsing the ADB sync protocol (SEND/DATA/DONE)
+- **Logcat capture** — optionally intercepts `logcat` output and forwards it to Matrix in configurable line batches
 - Matrix E2EE — all messages are encrypted using Olm/Megolm
 - Device-aware — includes device serial in notifications
 - Persistent E2EE session store — survive restarts without re-verifying
@@ -58,6 +60,8 @@ adb:
 intercept:
   shell_commands: true
   screenshots: true
+  apk_files: true           # capture APK files from adb install/push
+  logcat_output: false       # set to true to intercept logcat output
 
 filters:
   exclude_commands:
@@ -92,6 +96,16 @@ The proxy understands the ADB binary protocol:
 - **Shell v2 frames**: `[1 byte ID][4 bytes LE uint32 length][data]` — ID=1 stdout, ID=2 stderr, ID=3 exit code
 
 Screenshot PNG data is scattered across multiple shell_v2 stdout chunks. The proxy accumulates clean stdout data and searches for complete PNG (header + IEND) before forwarding to Matrix.
+
+### Sync protocol (APK capture)
+
+When `adb install` or `adb push` is used, ADB switches to the sync protocol after a `sync:` command:
+
+- **SEND**: `[4 bytes "SEND"][4 bytes LE length]["path,mode"]` — file transfer request
+- **DATA**: `[4 bytes "DATA"][4 bytes LE length][chunk data]` — file data chunk
+- **DONE**: `[4 bytes "DONE"][4 bytes mtime]` — file transfer complete
+
+The proxy enters sync mode on detecting `sync:`, parses SEND/DATA/DONE packets, and captures the complete file if the path ends with `.apk`.
 
 ## Environment variables
 
