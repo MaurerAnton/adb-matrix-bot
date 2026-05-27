@@ -1,0 +1,69 @@
+# ADB Matrix Bot Configuration
+# ================================
+
+# Matrix bot settings
+matrix:
+  homeserver: "https://matrix.org"
+  user_id: "@adb-bot:matrix.org"
+  # Use access_token OR password (access_token takes precedence)
+  access_token: ""
+  password: ""
+  # Room to send intercepts to (can be room ID !xxx:server or alias #xxx:server)
+  room_id: ""
+  # Device display name for Matrix sessions
+  device_name: "adb-mitm-bot"
+  # Path to store E2EE session (olm/megolm keys)
+  store_path: "./e2ee_store"
+
+# ADB proxy settings
+adb:
+  # Proxy listens on this port (ADB clients should connect here instead of 5037)
+  listen_host: "127.0.0.1"
+  listen_port: 5038
+  # Real ADB server to forward to
+  target_host: "127.0.0.1"
+  target_port: 5037
+
+# Interception rules
+intercept:
+  # Shell commands interception
+  shell_commands: true
+
+  # Capture and forward screenshots to Matrix
+  screenshots: true
+
+  # Forward command output (stdout/stderr) to Matrix  
+  command_output: true
+
+  # Max bytes of command output to forward (truncated if exceeded)
+  max_output_bytes: 4096
+
+  # Maximum screenshot file size to forward (bytes)
+  max_screenshot_bytes: 4194304  # 4MB
+
+# Filter rules — which commands to intercept or ignore
+filters:
+  # Only intercept these commands (empty = intercept ALL)
+  # Example: ["screencap", "input", "pm", "am"]
+  include_commands: []
+
+  # NEVER intercept these (always pass through silently)
+  exclude_commands:
+    - "logcat"
+    - "dumpsys"
+    - "bugreport"
+    - "cmd stats"
+    - "dumpsys meminfo"
+
+# Notification formatting
+formatting:
+  # Prefix for command notifications in Matrix
+  command_prefix: "📱 ADB"
+  # Prefix for screenshot notifications
+  screenshot_prefix: "📸 Screenshot"
+  # Prefix for error notifications  
+  error_prefix: "⚠️ ADB Error"
+  # Show timestamps on Matrix messages
+  show_timestamps: true
+  # Include device serial in messages
+  show_device: true
